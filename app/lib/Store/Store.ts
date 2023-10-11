@@ -1,4 +1,4 @@
-export interface Store {
-  get: <T>(name: string) => Promise<T | null>;
-  set: <T>(name: string, value: T) => Promise<void>;
+export interface Store<T> {
+  get: () => Promise<T | null>;
+  set: (value: T) => Promise<void>;
 }

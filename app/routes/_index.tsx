@@ -3,16 +3,51 @@ import type { MetaFunction, LoaderFunctionArgs } from "@remix-run/cloudflare";
 import { Link, useLoaderData } from "@remix-run/react";
 import { json } from "@remix-run/cloudflare";
 import type { WP_REST_API_Post, WP_REST_API_Posts } from "wp-types";
-import { getAllPosts } from "~/lib/posts";
+import { fetchPosts } from "~/lib/posts";
 import KVStore from "~/lib/Store/KVStore";
+import { STALE_TTL, TTL } from '~/config';
 
 export const meta: MetaFunction = () => {
   return [{ title: "Blog Posts From WP" }];
 };
 
 export const loader = async ({ context }: LoaderFunctionArgs) => {
-  const store = new KVStore((context.env as Env).POSTS);
-  const posts = await getAllPosts((context.env as Env).WORDPRESS_URL, store);
+  let posts: WP_REST_API_Posts = [];
+  const WORDPRESS_URL = (context.env as Env).WORDPRESS_URL;
+  const waitUntil =  context.waitUntil as (promise: Promise<any>) => void
+  const POSTS = (context.env as Env).POSTS;
+
+  const FreshPostsStore = new KVStore<WP_REST_API_Posts>(POSTS,
+    "FreshPosts",
+    { expirationTtl: TTL });
+  const freshPosts = await FreshPostsStore.get();
+
+  if (freshPosts) {
+    console.log('found.');
+    return json({ posts: freshPosts });
+  }
+
+  const StalePostsStore = new KVStore<WP_REST_API_Posts>(POSTS,
+    "StalePosts",
+    { expirationTtl: STALE_TTL });
+  const stalePosts = await StalePostsStore.get();
+
+  if (stalePosts) {
+    console.log('stale found.');
+    posts = stalePosts;
+    waitUntil((async () => {
+      const fetchedPosts = await fetchPosts(WORDPRESS_URL);
+      await FreshPostsStore.set(fetchedPosts);
+      await StalePostsStore.set(fetchedPosts);
+      return fetchedPosts;
+    })());
+  } else {
+    console.log('fetched.');
+    posts = await fetchPosts(WORDPRESS_URL);
+    await FreshPostsStore.set(posts);
+    await StalePostsStore.set(posts);
+  }
+
   return json({ posts });
 };
 

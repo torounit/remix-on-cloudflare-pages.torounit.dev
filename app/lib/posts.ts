@@ -1,5 +1,4 @@
 import type { WP_REST_API_Posts } from "wp-types";
-import type { Store } from "~/lib/Store/Store";
 import pLimit from "p-limit";
 
 const createPostsURL = (url: string, page: number, perPage: number) => {
@@ -36,27 +35,3 @@ export const fetchPosts = async (url: string): Promise<WP_REST_API_Posts> => {
   return [...posts, ...paged];
 };
 
-export const loadPostsToStore = async (WP_URL: string, store: Store) => {
-  const posts = await getAllPosts(WP_URL, store);
-  await store.set("posts", posts);
-};
-
-export const getAllPosts = async (
-  WP_URL: string,
-  store: Store | undefined,
-): Promise<WP_REST_API_Posts> => {
-  if (store) {
-    const posts = await store.get<typeof fetchedPosts>("posts");
-    if (posts) {
-      return posts;
-    }
-  }
-
-  const fetchedPosts = await fetchPosts(WP_URL);
-
-  if (store) {
-    await store.set("posts", fetchedPosts);
-  }
-
-  return fetchedPosts;
-};
