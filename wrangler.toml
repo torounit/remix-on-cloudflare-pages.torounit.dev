@@ -1,0 +1,9 @@
+compatibility_date = "2023-10-10"
+
+kv_namespaces = [
+  { binding = "POSTS", id = "c9cdb7d9f01e4f66b4a992aa7a449afd" }
+]
+
+[vars]
+WORDPRESS_URL="https://wordpress.org/news/"
+
