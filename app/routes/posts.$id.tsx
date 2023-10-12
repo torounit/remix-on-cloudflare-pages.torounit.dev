@@ -17,11 +17,24 @@ const pickPost = (posts: WP_REST_API_Posts, id: number) => {
 
 export const loader = async ({ context, params }: LoaderFunctionArgs) => {
   const postId = parseInt(params.id || "0", 10);
+  if ( ! postId ) {
+    throw new Response(null, {
+      status: 404,
+      statusText: "Not Found",
+    });
+  }
   const WORDPRESS_URL = (context.env as Env).WORDPRESS_URL;
   const waitUntil = context.waitUntil as (promise: Promise<any>) => void
   const POSTS = (context.env as Env).POSTS;
   const posts = await loadAllPosts( WORDPRESS_URL,  POSTS, waitUntil);
-  return json({ post: pickPost(posts, postId) });
+  const post = pickPost(posts, postId);
+  if ( ! post ) {
+    throw new Response(null, {
+      status: 404,
+      statusText: "Not Found",
+    });
+  }
+  return json({ post });
 };
 
 export default function Index() {
