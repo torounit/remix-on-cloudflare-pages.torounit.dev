@@ -2,9 +2,7 @@ import type { MetaFunction, LoaderFunctionArgs } from "@remix-run/cloudflare";
 import { useLoaderData } from "@remix-run/react";
 import { json } from "@remix-run/cloudflare";
 import type { WP_REST_API_Post , WP_REST_API_Posts } from "wp-types";
-import KVStore from "~/lib/Store/KVStore";
-import { fetchPosts } from '~/lib/posts';
-import { STALE_TTL, TTL } from '~/config';
+import { loadAllPosts } from '~/lib/loader';
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
   const post = data?.post as WP_REST_API_Post | undefined;
@@ -19,42 +17,10 @@ const pickPost = (posts: WP_REST_API_Posts, id: number) => {
 
 export const loader = async ({ context, params }: LoaderFunctionArgs) => {
   const postId = parseInt(params.id || "0", 10);
-  let posts: WP_REST_API_Posts = [];
   const WORDPRESS_URL = (context.env as Env).WORDPRESS_URL;
   const waitUntil = context.waitUntil as (promise: Promise<any>) => void
   const POSTS = (context.env as Env).POSTS;
-
-  const FreshPostsStore = new KVStore<WP_REST_API_Posts>(POSTS,
-    "FreshPosts",
-    { expirationTtl: TTL });
-  const freshPosts = await FreshPostsStore.get();
-
-  if (freshPosts) {
-    console.log('found.');
-    return json({ post: pickPost(freshPosts, postId) });
-  }
-
-  const StalePostsStore = new KVStore<WP_REST_API_Posts>(POSTS,
-    "StalePosts",
-    { expirationTtl: STALE_TTL });
-  const stalePosts = await StalePostsStore.get();
-
-  if (stalePosts) {
-    console.log('stale found.');
-    posts = stalePosts;
-    waitUntil((async () => {
-      const fetchedPosts = await fetchPosts(WORDPRESS_URL);
-      await FreshPostsStore.set(fetchedPosts);
-      await StalePostsStore.set(fetchedPosts);
-      return fetchedPosts;
-    })());
-  } else {
-    console.log('fetched.');
-    posts = await fetchPosts(WORDPRESS_URL);
-    await FreshPostsStore.set(posts);
-    await StalePostsStore.set(posts);
-  }
-
+  const posts = await loadAllPosts( WORDPRESS_URL,  POSTS, waitUntil);
   return json({ post: pickPost(posts, postId) });
 };
 
